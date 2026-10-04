@@ -174,7 +174,7 @@ functions:
 | --- | --- |
 | `parse_args()` | Reads the options typed on the command line |
 | `load_model()` | Loads the Whisper model in `int8` format, which is fast on a normal CPU |
-| `split_into_subtitles()` | Cuts long sentences into subtitles of up to 42 characters, using each word's timing |
+| `split_into_subtitles()` | Cuts long sentences into evenly sized subtitles of up to 42 characters, using each word's timing, so no word is left on its own |
 | `format_time()` | Turns seconds (`75.5`) into SRT time (`00:01:15,500`) |
 | `write_srt()` | Writes each subtitle as soon as it's ready, and shows progress |
 | `main()` | Puts it all together |
@@ -208,8 +208,9 @@ They check:
 - **Options**: automatic language detection by default; `--language`,
   `--multilingual`, `--translate` and `--no-vad` are passed to Whisper
   correctly, and loop protection is never switched off.
-- **Subtitle splitting**: long sentences are split at the right words, with
-  the right times.
+- **Subtitle splitting**: long sentences are split into similar-sized
+  subtitles at the right words, with the right times, and never leave a
+  single word on its own (a real problem found on a test song).
 - **Time formatting**: including rounding, e.g. 2.5 s → `00:00:02,500`, not
   `00:00:02,499`.
 - **A complete SRT file** compared line by line with the expected output.
@@ -231,6 +232,8 @@ tests/test_transcribe.py::test_format_time[3600-01:00:00,000] PASSED
 tests/test_transcribe.py::test_format_time[5025.125-01:23:45,125] PASSED
 tests/test_transcribe.py::test_short_segment_stays_as_one_subtitle PASSED
 tests/test_transcribe.py::test_long_segment_is_split_using_word_times PASSED
+tests/test_transcribe.py::test_no_single_word_left_on_its_own PASSED
+tests/test_transcribe.py::test_split_subtitles_are_similar_lengths PASSED
 tests/test_transcribe.py::test_single_word_longer_than_limit_is_kept_whole PASSED
 tests/test_transcribe.py::test_any_language_is_written_correctly[spanish] PASSED
 tests/test_transcribe.py::test_any_language_is_written_correctly[hindi] PASSED
@@ -262,7 +265,7 @@ tests/test_transcribe.py::test_bad_answers_are_asked_again PASSED
 tests/test_transcribe.py::test_questions_then_transcribe PASSED
 tests/test_transcribe.py::test_ctrl_c_while_answering_cancels_cleanly PASSED
 
-39 passed in 0.08s
+41 passed in 0.09s
 ```
 
 ## Limitations

@@ -17,6 +17,7 @@ Or give the options directly:
 """
 
 import argparse
+import math
 import shlex
 import sys
 import time
@@ -229,21 +230,38 @@ def make_subtitle(words):
 
 
 def split_into_subtitles(words, max_chars):
-    """Split one segment's words into subtitles no longer than max_chars.
+    """Split one segment's words into evenly sized subtitles.
 
     Whisper's segments can be long sentences. Using the timing of each word,
-    we cut them into shorter subtitles that appear exactly when they are spoken.
+    we cut them into shorter subtitles that appear exactly when they are
+    spoken. We aim for subtitles of similar length, so a sentence becomes
+    "you are the magnet / and I am the metal" rather than leaving a single
+    word ("metal") on its own for half a second.
     """
+    full_text = "".join(word.word for word in words).strip()
+    if len(full_text) <= max_chars:
+        return [make_subtitle(words)]
+
+    # How many subtitles do we need, and how long should each one be?
+    # math.ceil rounds up: 46 characters with a limit of 42 needs 2.
+    pieces = math.ceil(len(full_text) / max_chars)
+    target = len(full_text) / pieces
+
     subtitles = []
     current = []  # the words in the subtitle we are building
 
     for word in words:
-        # How long would the subtitle be if we added this word?
+        current_text = "".join(w.word for w in current).strip()
         new_text = "".join(w.word for w in current + [word]).strip()
-        if current and len(new_text) > max_chars:
-            # Too long: finish the current subtitle and start a new one.
-            subtitles.append(make_subtitle(current))
-            current = []
+
+        if current and len(new_text) > target:
+            # Adding this word takes us past the target length. Start a new
+            # subtitle if that keeps us closer to the target, or if adding
+            # the word would break the hard limit.
+            if (len(new_text) > max_chars
+                    or abs(len(current_text) - target) <= abs(len(new_text) - target)):
+                subtitles.append(make_subtitle(current))
+                current = []
         current.append(word)
 
     # Don't forget the last subtitle.

@@ -88,12 +88,36 @@ def test_long_segment_is_split_using_word_times():
     ]
     subtitles = transcribe.split_into_subtitles(words, 10)
     assert subtitles == [
-        (0.0, 0.6, "This is a"),
-        (0.6, 1.0, "long"),
+        (0.0, 0.5, "This is"),
+        (0.5, 1.0, "a long"),
         (1.0, 1.8, "sentence."),
     ]
     # Every subtitle fits the limit.
     assert all(len(text) <= 10 for _, _, text in subtitles)
+
+
+def test_no_single_word_left_on_its_own():
+    # Regression test from a real song: the old splitter filled the first
+    # subtitle up to 42 characters and left "metal" alone for 0.6 seconds.
+    text = "Oh, you, you are the magnet and I am the metal"
+    words = [word(" " + w, i * 0.4, i * 0.4 + 0.4) for i, w in enumerate(text.split())]
+
+    subtitles = transcribe.split_into_subtitles(words, 42)
+
+    assert [t for _, _, t in subtitles] == [
+        "Oh, you, you are the",
+        "magnet and I am the metal",
+    ]
+
+
+def test_split_subtitles_are_similar_lengths():
+    text = "I want to breathe your neck slowly let me tell you things in your ear"
+    words = [word(" " + w, i, i + 1.0) for i, w in enumerate(text.split())]
+
+    lengths = [len(t) for _, _, t in transcribe.split_into_subtitles(words, 42)]
+
+    assert all(length <= 42 for length in lengths)
+    assert max(lengths) - min(lengths) <= 10
 
 
 def test_single_word_longer_than_limit_is_kept_whole():
