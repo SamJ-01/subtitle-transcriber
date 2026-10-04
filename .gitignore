@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Your own media and subtitles: keep them out of the repo
+*.srt
+*.mp3
+*.mp4
+*.m4a
+*.wav
+*.mkv
+*.webm

@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # The tests use a fake model, so only pytest is needed here,
+      # not faster-whisper and its large model download.
+      - name: Install
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest -v
