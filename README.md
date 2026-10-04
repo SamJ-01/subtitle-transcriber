@@ -65,6 +65,47 @@ The first time you run it, the chosen model is downloaded (the default
 
 ## Usage
 
+### The easy way: answer questions
+
+Run it with no options and it asks you what you need:
+
+```bash
+python transcribe.py
+```
+
+```text
+Answer each question, or press Enter for the default.
+
+Drag the audio or video file here, then press Enter: /Users/sam/Desktop/Luis\ Fonsi\ -\ Despacito.mp3
+
+What are you transcribing?
+  1. Talking: videos, reactions, films, interviews
+  2. A song or music video
+Choose 1-2 [1]: 2
+
+What language is it? Type a code such as en, es, fr, hi or ja,
+or press Enter to detect it automatically: es
+
+Does it switch between languages? (Whisper re-checks the language
+every 30 seconds; that interval is fixed by the model) [y/N] n
+
+Translate the subtitles into English? [y/N] n
+
+Speed or accuracy?
+  1. Fast: good for clear speech
+  2. Balanced: recommended for most videos and other languages
+  3. Most accurate: slowest (about 3 GB download), best for songs
+Choose 1-3 [3]:
+
+Next time, you can skip the questions with:
+  python transcribe.py '/Users/sam/Desktop/Luis Fonsi - Despacito.mp3' --model large-v3 --language es --no-vad
+```
+
+You can drag the file from Finder into the Terminal window instead of typing
+its path. To answer questions about a file you've already named, add `-i`.
+
+### The quick way: options on the command line
+
 ```bash
 python transcribe.py audio.mp3                   # creates audio.srt
 python transcribe.py movie.mp4 -o movie.srt      # choose the output name
@@ -77,7 +118,8 @@ python transcribe.py mixed.mp3 --multilingual    # switches between languages
 
 | Option | Meaning |
 | --- | --- |
-| `input` | The audio or video file to transcribe |
+| `input` | The audio or video file to transcribe (leave out to be asked questions) |
+| `-i, --interactive` | Ask questions even though you've named the file |
 | `-o, --output` | Where to save the subtitles (default: the input's name, ending `.srt`) |
 | `--language` | Language code, e.g. `en`, `es`, `fr`, `de`, `hi`, `ja`, `ko`, `ar`, `ru`, `pt` (default: detect automatically) |
 | `--multilingual` | For audio that switches language: detects the language again for every 30-second section |
@@ -171,6 +213,9 @@ They check:
 - **Time formatting**: including rounding, e.g. 2.5 s → `00:00:02,500`, not
   `00:00:02,499`.
 - **A complete SRT file** compared line by line with the expected output.
+- **The questions**: answers set the right options, pressing Enter gives
+  sensible defaults, wrong answers are asked again, paths dragged in from
+  Finder are cleaned up, and Ctrl+C cancels cleanly.
 - **Edge cases**: empty segments, missing word timings, zero-length audio and
   a missing input file.
 
@@ -208,8 +253,16 @@ tests/test_transcribe.py::test_segment_without_word_times_uses_segment_times PAS
 tests/test_transcribe.py::test_zero_length_audio_does_not_crash PASSED
 tests/test_transcribe.py::test_output_name_can_be_chosen PASSED
 tests/test_transcribe.py::test_missing_file_is_a_clear_error PASSED
+tests/test_transcribe.py::test_dragged_in_paths_are_cleaned[/Users/sam/Desktop/Luis\ Fonsi\ -\ Despacito.mp3 -/Users/sam/Desktop/Luis Fonsi - Despacito.mp3] PASSED
+tests/test_transcribe.py::test_dragged_in_paths_are_cleaned['/Users/sam/my video.mp4'-/Users/sam/my video.mp4] PASSED
+tests/test_transcribe.py::test_dragged_in_paths_are_cleaned[clip.mp3-clip.mp3] PASSED
+tests/test_transcribe.py::test_questions_for_a_song PASSED
+tests/test_transcribe.py::test_pressing_enter_gives_the_defaults PASSED
+tests/test_transcribe.py::test_bad_answers_are_asked_again PASSED
+tests/test_transcribe.py::test_questions_then_transcribe PASSED
+tests/test_transcribe.py::test_ctrl_c_while_answering_cancels_cleanly PASSED
 
-31 passed in 0.07s
+39 passed in 0.08s
 ```
 
 ## Limitations

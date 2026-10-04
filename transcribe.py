@@ -4,7 +4,10 @@ Uses faster-whisper (an optimised version of OpenAI's Whisper speech
 recognition model), which understands around 100 languages and runs entirely
 on your own computer. Nothing is uploaded anywhere.
 
-Examples:
+Run it with no options and it asks you questions instead:
+    python transcribe.py
+
+Or give the options directly:
     python transcribe.py audio.mp3                   # detect the language
     python transcribe.py movie.mp4 -o movie.srt      # choose the output name
     python transcribe.py clip.mp3 --language ja      # tell it the language
@@ -14,6 +17,7 @@ Examples:
 """
 
 import argparse
+import shlex
 import sys
 import time
 from pathlib import Path
@@ -30,7 +34,15 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Transcribe an audio or video file into an SRT subtitle file."
     )
-    parser.add_argument("input", help="the audio or video file to transcribe")
+    # nargs="?" makes the file optional: without it, we ask for it instead.
+    parser.add_argument(
+        "input", nargs="?",
+        help="the audio or video file to transcribe (leave out to be asked questions)",
+    )
+    parser.add_argument(
+        "-i", "--interactive", action="store_true",
+        help="ask questions about the file before transcribing",
+    )
     parser.add_argument(
         "-o", "--output",
         help="where to save the subtitles (default: same name as the input, ending .srt)",
@@ -69,6 +81,127 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
+# --- asking questions ------------------------------------------------------ #
+MODEL_CHOICES = [
+    ("small", "Fast: good for clear speech"),
+    ("medium", "Balanced: recommended for most videos and other languages"),
+    ("large-v3", "Most accurate: slowest (about 3 GB download), best for songs"),
+]
+
+
+def clean_dropped_path(text):
+    """Turn a path dragged into Terminal back into a normal path.
+
+    Terminal adds backslashes before spaces when you drag a file in
+    ("Luis\\ Fonsi.mp3"), and some people add quotes. shlex.split() undoes
+    both, the same way the shell itself would.
+    """
+    try:
+        return " ".join(shlex.split(text))
+    except ValueError:  # e.g. an unmatched quote: use it as typed
+        return text.strip()
+
+
+def ask_yes_no(question, default=False):
+    """Ask a yes/no question. Pressing Enter gives the default."""
+    hint = "[Y/n]" if default else "[y/N]"  # the capital letter is the default
+    while True:
+        answer = input(f"{question} {hint} ").strip().lower()
+        if answer == "":
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+        print("Please type y or n.")
+
+
+def ask_choice(question, choices, default):
+    """Show a numbered menu and return the value the user picks.
+
+    choices is a list of (value, description) pairs. default is a number.
+    """
+    print(question)
+    for number, (_, description) in enumerate(choices, start=1):
+        print(f"  {number}. {description}")
+    while True:
+        answer = input(f"Choose 1-{len(choices)} [{default}]: ").strip()
+        if answer == "":
+            answer = str(default)
+        if answer.isdigit() and 1 <= int(answer) <= len(choices):
+            return choices[int(answer) - 1][0]
+        print(f"Please type a number from 1 to {len(choices)}.")
+
+
+def ask_questions(args):
+    """Fill in the options by asking the user, instead of typing flags."""
+    print("Answer each question, or press Enter for the default.\n")
+
+    # 1. Which file? Keep asking until it exists.
+    while not args.input:
+        path = clean_dropped_path(input("Drag the audio or video file here, then press Enter: "))
+        if Path(path).is_file():
+            args.input = path
+        else:
+            print(f"Can't find '{path}'. Please try again.")
+    print()
+
+    # 2. Speech or music? This decides whether to skip "music" parts.
+    kind = ask_choice(
+        "What are you transcribing?",
+        [("speech", "Talking: videos, reactions, films, interviews"),
+         ("song", "A song or music video")],
+        default=1,
+    )
+    args.no_vad = kind == "song"
+    print()
+
+    # 3. Which language?
+    language = input(
+        "What language is it? Type a code such as en, es, fr, hi or ja,\n"
+        "or press Enter to detect it automatically: "
+    ).strip().lower()
+    args.language = language or None
+    print()
+
+    # 4. More than one language?
+    args.multilingual = ask_yes_no(
+        "Does it switch between languages? (Whisper re-checks the language\n"
+        "every 30 seconds; that interval is fixed by the model)",
+    )
+    print()
+
+    # 5. Original language or English?
+    args.translate = ask_yes_no("Translate the subtitles into English?")
+    print()
+
+    # 6. Speed or accuracy? Recommend the bigger model for songs.
+    args.model = ask_choice(
+        "Speed or accuracy?", MODEL_CHOICES, default=3 if args.no_vad else 2
+    )
+    print()
+    return args
+
+
+def equivalent_command(args):
+    """Build the command that would give the same result without questions."""
+    parts = ["python transcribe.py", shlex.quote(args.input)]
+    if args.output:
+        parts += ["-o", shlex.quote(args.output)]
+    if args.model != "medium":
+        parts += ["--model", args.model]
+    if args.language:
+        parts += ["--language", args.language]
+    if args.multilingual:
+        parts.append("--multilingual")
+    if args.translate:
+        parts.append("--translate")
+    if args.no_vad:
+        parts.append("--no-vad")
+    return " ".join(parts)
+
+
+# --- subtitles -------------------------------------------------------------- #
 def format_time(seconds):
     """Turn a number of seconds into SRT time format.
 
@@ -174,6 +307,16 @@ def load_model(model_size):
 
 def main(argv=None):
     args = parse_args(argv)
+
+    # No file given (or -i): ask questions instead of needing flags.
+    if args.interactive or not args.input:
+        try:
+            args = ask_questions(args)
+        except (KeyboardInterrupt, EOFError):  # Ctrl+C or Ctrl+D
+            print("\nCancelled.")
+            return 130
+        print("Next time, you can skip the questions with:")
+        print(f"  {equivalent_command(args)}\n")
 
     input_path = Path(args.input)
     if not input_path.is_file():

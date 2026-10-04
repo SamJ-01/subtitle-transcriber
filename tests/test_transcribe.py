@@ -233,3 +233,101 @@ def test_output_name_can_be_chosen(tmp_path, monkeypatch):
 def test_missing_file_is_a_clear_error(tmp_path, capsys):
     assert transcribe.main([str(tmp_path / "missing.mp3")]) == 1
     assert "file not found" in capsys.readouterr().err
+
+
+# --- asking questions ------------------------------------------------------ #
+def fake_typing(monkeypatch, answers):
+    """Pretend the user types each answer in turn when input() is called."""
+    answers = iter(answers)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
+
+
+@pytest.mark.parametrize(
+    "typed, expected",
+    [
+        ("/Users/sam/Desktop/Luis\\ Fonsi\\ -\\ Despacito.mp3 ",   # dragged in
+         "/Users/sam/Desktop/Luis Fonsi - Despacito.mp3"),
+        ("'/Users/sam/my video.mp4'", "/Users/sam/my video.mp4"),  # quoted
+        ("clip.mp3", "clip.mp3"),
+    ],
+)
+def test_dragged_in_paths_are_cleaned(typed, expected):
+    assert transcribe.clean_dropped_path(typed) == expected
+
+
+def test_questions_for_a_song(tmp_path, monkeypatch):
+    song = tmp_path / "song.mp3"
+    song.write_bytes(b"")
+    args = transcribe.parse_args([])
+    #                   file       song  language  mixed? translate?  model
+    fake_typing(monkeypatch, [str(song), "2", "es", "y", "n", ""])
+
+    args = transcribe.ask_questions(args)
+
+    assert args.input == str(song)
+    assert args.no_vad is True          # songs keep the music
+    assert args.language == "es"
+    assert args.multilingual is True
+    assert args.translate is False
+    assert args.model == "large-v3"     # default recommendation for songs
+
+
+def test_pressing_enter_gives_the_defaults(tmp_path, monkeypatch):
+    clip = tmp_path / "clip.mp3"
+    clip.write_bytes(b"")
+    args = transcribe.parse_args([str(clip), "-i"])   # file already given
+    fake_typing(monkeypatch, ["", "", "", "", ""])
+
+    args = transcribe.ask_questions(args)
+
+    assert args.no_vad is False         # speech
+    assert args.language is None        # detect automatically
+    assert args.multilingual is False
+    assert args.translate is False
+    assert args.model == "medium"
+
+
+def test_bad_answers_are_asked_again(tmp_path, monkeypatch):
+    clip = tmp_path / "clip.mp3"
+    clip.write_bytes(b"")
+    args = transcribe.parse_args([])
+    fake_typing(monkeypatch, [
+        str(tmp_path / "missing.mp3"), str(clip),   # wrong file, then right one
+        "7", "1",                                   # not a menu option, then 1
+        "",
+        "maybe", "n",                               # not y/n, then n
+        "",
+        "",
+    ])
+
+    args = transcribe.ask_questions(args)
+
+    assert args.input == str(clip)
+    assert args.no_vad is False
+
+
+def test_questions_then_transcribe(tmp_path, monkeypatch, capsys):
+    clip = tmp_path / "clip.mp3"
+    clip.write_bytes(b"")
+    model = FakeModel([segment([word(" Hola", 0, 1)])])
+    monkeypatch.setattr(transcribe, "load_model", lambda size: model)
+    fake_typing(monkeypatch, [str(clip), "2", "es", "n", "y", "1"])
+
+    assert transcribe.main([]) == 0
+
+    assert model.called_with["language"] == "es"
+    assert model.called_with["task"] == "translate"
+    assert model.called_with["vad_filter"] is False
+    out = capsys.readouterr().out
+    # It shows the shortcut command for next time.
+    assert "--model small --language es --translate --no-vad" in out
+    assert (tmp_path / "clip.srt").exists()
+
+
+def test_ctrl_c_while_answering_cancels_cleanly(monkeypatch, capsys):
+    def press_ctrl_c(prompt=""):
+        raise KeyboardInterrupt
+    monkeypatch.setattr("builtins.input", press_ctrl_c)
+
+    assert transcribe.main([]) == 130
+    assert "Cancelled" in capsys.readouterr().out
