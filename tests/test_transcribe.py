@@ -33,10 +33,10 @@ def segment(words, text=None):
 class FakeModel:
     """Stands in for WhisperModel and remembers how it was called."""
 
-    def __init__(self, segments, language="en", duration=10.0):
+    def __init__(self, segments, language="en", duration=10.0, probability=0.98):
         self.segments = segments
         self.info = SimpleNamespace(
-            language=language, language_probability=0.98, duration=duration
+            language=language, language_probability=probability, duration=duration
         )
         self.called_with = None
 
@@ -135,6 +135,22 @@ def test_language_can_be_chosen(tmp_path, monkeypatch):
     _, model = run(tmp_path, monkeypatch, [segment([word(" Hola", 0, 1)])],
                    extra_args=["--language", "es"])
     assert model.called_with["language"] == "es"
+
+
+def test_unsure_language_guess_gives_a_warning(tmp_path, monkeypatch, capsys):
+    run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])], probability=0.24)
+    assert "not sure about the language" in capsys.readouterr().out
+
+
+def test_confident_language_guess_gives_no_warning(tmp_path, monkeypatch, capsys):
+    run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])], probability=0.9)
+    assert "not sure" not in capsys.readouterr().out
+
+
+def test_no_warning_when_language_is_chosen(tmp_path, monkeypatch, capsys):
+    run(tmp_path, monkeypatch, [segment([word(" Hola", 0, 1)])],
+        extra_args=["--language", "es"], probability=0.24)
+    assert "not sure" not in capsys.readouterr().out
 
 
 def test_translate_option_asks_for_english(tmp_path, monkeypatch):

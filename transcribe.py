@@ -20,6 +20,9 @@ from pathlib import Path
 # Print a progress line every time we get this many percent further through.
 PROGRESS_STEP = 2
 
+# Warn if Whisper is less sure than this about which language it detected.
+LOW_CONFIDENCE = 0.5
+
 
 def parse_args(argv=None):
     """Read the options the user typed on the command line."""
@@ -200,6 +203,13 @@ def main(argv=None):
         f"Language: {info.language} ({info.language_probability:.0%} sure) | "
         f"Length: {info.duration / 60:.1f} min\n"
     )
+    # Whisper guesses the language from the first 30 seconds. A music intro
+    # can fool it, and a wrong guess gives a poor transcript, so say so.
+    if args.language is None and info.language_probability < LOW_CONFIDENCE:
+        print(
+            f"Warning: not sure about the language. If '{info.language}' is wrong, "
+            "press Ctrl+C and run again with --language (e.g. --language es).\n"
+        )
 
     count = write_srt(segments, info.duration, output_path, args.max_chars)
 

@@ -190,6 +190,9 @@ tests/test_transcribe.py::test_any_language_is_written_correctly[arabic] PASSED
 tests/test_transcribe.py::test_any_language_is_written_correctly[russian] PASSED
 tests/test_transcribe.py::test_language_is_detected_automatically_by_default PASSED
 tests/test_transcribe.py::test_language_can_be_chosen PASSED
+tests/test_transcribe.py::test_unsure_language_guess_gives_a_warning PASSED
+tests/test_transcribe.py::test_confident_language_guess_gives_no_warning PASSED
+tests/test_transcribe.py::test_no_warning_when_language_is_chosen PASSED
 tests/test_transcribe.py::test_translate_option_asks_for_english PASSED
 tests/test_transcribe.py::test_music_filter_is_on_by_default PASSED
 tests/test_transcribe.py::test_no_vad_option_keeps_music PASSED
@@ -199,13 +202,17 @@ tests/test_transcribe.py::test_zero_length_audio_does_not_crash PASSED
 tests/test_transcribe.py::test_output_name_can_be_chosen PASSED
 tests/test_transcribe.py::test_missing_file_is_a_clear_error PASSED
 
-25 passed in 0.06s
+28 passed in 0.06s
 ```
 
 ## Limitations
 
 - **Accuracy varies by language.** Whisper is strongest in widely spoken
   languages; for less common ones, use `--model large-v3` and check the result.
+- **Language detection only listens to the first 30 seconds.** A music
+  intro can fool it, so if it warns that it's unsure, run again with
+  `--language`. This matters most with `--no-vad`: on the same song it
+  guessed English (24% sure) instead of Spanish.
 - **Songs need `--no-vad`.** The silence/music filter is tuned for speech,
   so it treats singing over a backing track as music and skips it. In a test
   on a 4.7-minute pop song with the filter on, it wrote only 11 subtitles.
