@@ -71,6 +71,7 @@ python transcribe.py movie.mp4 -o movie.srt      # choose the output name
 python transcribe.py clip.mp3 --language ja      # tell it the language
 python transcribe.py clip.mp3 --translate        # English subtitles from any language
 python transcribe.py clip.mp3 --model small      # faster, slightly less accurate
+python transcribe.py song.mp3 --no-vad           # songs and music videos
 ```
 
 | Option | Meaning |
@@ -79,6 +80,7 @@ python transcribe.py clip.mp3 --model small      # faster, slightly less accurat
 | `-o, --output` | Where to save the subtitles (default: the input's name, ending `.srt`) |
 | `--language` | Language code, e.g. `en`, `es`, `fr`, `de`, `hi`, `ja`, `ko`, `ar`, `ru`, `pt` (default: detect automatically) |
 | `--translate` | Translate the speech into English subtitles |
+| `--no-vad` | Don't skip music. **Use this for songs**, otherwise most of the singing is skipped |
 | `--model` | `tiny`, `base`, `small`, `medium` or `large-v3` (default: `medium`) |
 | `--max-chars` | Longest a single subtitle can be, in characters (default: 42) |
 
@@ -158,8 +160,8 @@ They check:
 
 - **Any language works**: Spanish, Hindi, Japanese (which has no spaces),
   Arabic and Russian text all come through correctly.
-- **Language options**: automatic detection by default, `--language` and
-  `--translate` are passed to Whisper correctly.
+- **Options**: automatic language detection by default; `--language`,
+  `--translate` and `--no-vad` are passed to Whisper correctly.
 - **Subtitle splitting**: long sentences are split at the right words, with
   the right times.
 - **Time formatting**: including rounding, e.g. 2.5 s → `00:00:02,500`, not
@@ -189,19 +191,24 @@ tests/test_transcribe.py::test_any_language_is_written_correctly[russian] PASSED
 tests/test_transcribe.py::test_language_is_detected_automatically_by_default PASSED
 tests/test_transcribe.py::test_language_can_be_chosen PASSED
 tests/test_transcribe.py::test_translate_option_asks_for_english PASSED
+tests/test_transcribe.py::test_music_filter_is_on_by_default PASSED
+tests/test_transcribe.py::test_no_vad_option_keeps_music PASSED
 tests/test_transcribe.py::test_full_srt_output PASSED
 tests/test_transcribe.py::test_segment_without_word_times_uses_segment_times PASSED
 tests/test_transcribe.py::test_zero_length_audio_does_not_crash PASSED
 tests/test_transcribe.py::test_output_name_can_be_chosen PASSED
 tests/test_transcribe.py::test_missing_file_is_a_clear_error PASSED
 
-23 passed in 0.06s
+25 passed in 0.06s
 ```
 
 ## Limitations
 
 - **Accuracy varies by language.** Whisper is strongest in widely spoken
   languages; for less common ones, use `--model large-v3` and check the result.
+- **Songs need `--no-vad`.** The silence/music filter is tuned for speech,
+  so it treats singing over a backing track as music and skips it. In a test
+  on a 4.7-minute pop song with the filter on, it wrote only 11 subtitles.
 - **Always proofread.** Names, slang, songs and overlapping speech can be
   misheard.
 - `--translate` only translates **into English** (a Whisper limitation).

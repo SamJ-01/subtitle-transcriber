@@ -143,6 +143,17 @@ def test_translate_option_asks_for_english(tmp_path, monkeypatch):
     assert model.called_with["task"] == "translate"
 
 
+def test_music_filter_is_on_by_default(tmp_path, monkeypatch):
+    _, model = run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])])
+    assert model.called_with["vad_filter"] is True
+
+
+def test_no_vad_option_keeps_music(tmp_path, monkeypatch):
+    _, model = run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])],
+                   extra_args=["--no-vad"])
+    assert model.called_with["vad_filter"] is False
+
+
 # --- the finished SRT file ------------------------------------------------- #
 def test_full_srt_output(tmp_path, monkeypatch):
     segments = [

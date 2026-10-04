@@ -9,6 +9,7 @@ Examples:
     python transcribe.py movie.mp4 -o movie.srt      # choose the output name
     python transcribe.py clip.mp3 --language ja      # tell it the language
     python transcribe.py clip.mp3 --translate        # English subtitles
+    python transcribe.py song.mp3 --no-vad           # songs and music videos
 """
 
 import argparse
@@ -44,6 +45,11 @@ def parse_args(argv=None):
         "--translate", action="store_true",
         help="translate the speech into English subtitles instead of "
              "keeping the original language",
+    )
+    parser.add_argument(
+        "--no-vad", action="store_true",
+        help="don't skip parts that sound like music or silence. Use this "
+             "for songs, where the singing would otherwise be skipped",
     )
     parser.add_argument(
         "--max-chars", type=int, default=42,
@@ -185,7 +191,9 @@ def main(argv=None):
         beam_size=1,                # check one guess at a time: fastest option
         temperature=0,              # always pick the most likely words
         condition_on_previous_text=False,  # stops it getting stuck repeating a line
-        vad_filter=True,            # skip silence and music, where Whisper invents text
+        # Skip silence and music, where Whisper invents text. --no-vad turns
+        # this off for songs, because sung vocals don't sound like speech.
+        vad_filter=not args.no_vad,
         word_timestamps=True,       # time every word, so we can split subtitles accurately
     )
     print(
