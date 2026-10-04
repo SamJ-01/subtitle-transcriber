@@ -72,6 +72,7 @@ python transcribe.py clip.mp3 --language ja      # tell it the language
 python transcribe.py clip.mp3 --translate        # English subtitles from any language
 python transcribe.py clip.mp3 --model small      # faster, slightly less accurate
 python transcribe.py song.mp3 --no-vad           # songs and music videos
+python transcribe.py mixed.mp3 --multilingual    # switches between languages
 ```
 
 | Option | Meaning |
@@ -79,6 +80,7 @@ python transcribe.py song.mp3 --no-vad           # songs and music videos
 | `input` | The audio or video file to transcribe |
 | `-o, --output` | Where to save the subtitles (default: the input's name, ending `.srt`) |
 | `--language` | Language code, e.g. `en`, `es`, `fr`, `de`, `hi`, `ja`, `ko`, `ar`, `ru`, `pt` (default: detect automatically) |
+| `--multilingual` | For audio that switches language: detects the language again for every 30-second section |
 | `--translate` | Translate the speech into English subtitles |
 | `--no-vad` | Don't skip music. **Use this for songs**, otherwise most of the singing is skipped |
 | `--model` | `tiny`, `base`, `small`, `medium` or `large-v3` (default: `medium`) |
@@ -142,7 +144,8 @@ Key Whisper settings, and why:
 | `vad_filter=True` | Skips silence and music, the main cause of made-up lines like "Thanks for watching!" |
 | `word_timestamps=True` | Times every word, so subtitles can be split accurately |
 | `condition_on_previous_text=False` | Stops it getting stuck repeating the same line in long videos |
-| `beam_size=1`, `temperature=0` | Fastest decoding; always picks the most likely words |
+| `beam_size=1` | Fastest decoding: checks one guess at a time |
+| `temperature` left at the default | If a section gets stuck in a loop ("a little bit of a little bit of..."), Whisper retries it with a little randomness to break out |
 
 ## Tests
 
@@ -161,7 +164,8 @@ They check:
 - **Any language works**: Spanish, Hindi, Japanese (which has no spaces),
   Arabic and Russian text all come through correctly.
 - **Options**: automatic language detection by default; `--language`,
-  `--translate` and `--no-vad` are passed to Whisper correctly.
+  `--multilingual`, `--translate` and `--no-vad` are passed to Whisper
+  correctly, and loop protection is never switched off.
 - **Subtitle splitting**: long sentences are split at the right words, with
   the right times.
 - **Time formatting**: including rounding, e.g. 2.5 s → `00:00:02,500`, not
@@ -193,6 +197,9 @@ tests/test_transcribe.py::test_language_can_be_chosen PASSED
 tests/test_transcribe.py::test_unsure_language_guess_gives_a_warning PASSED
 tests/test_transcribe.py::test_confident_language_guess_gives_no_warning PASSED
 tests/test_transcribe.py::test_no_warning_when_language_is_chosen PASSED
+tests/test_transcribe.py::test_multilingual_is_off_by_default PASSED
+tests/test_transcribe.py::test_multilingual_option PASSED
+tests/test_transcribe.py::test_loop_protection_is_not_disabled PASSED
 tests/test_transcribe.py::test_translate_option_asks_for_english PASSED
 tests/test_transcribe.py::test_music_filter_is_on_by_default PASSED
 tests/test_transcribe.py::test_no_vad_option_keeps_music PASSED
@@ -202,7 +209,7 @@ tests/test_transcribe.py::test_zero_length_audio_does_not_crash PASSED
 tests/test_transcribe.py::test_output_name_can_be_chosen PASSED
 tests/test_transcribe.py::test_missing_file_is_a_clear_error PASSED
 
-28 passed in 0.06s
+31 passed in 0.07s
 ```
 
 ## Limitations
@@ -213,6 +220,10 @@ tests/test_transcribe.py::test_missing_file_is_a_clear_error PASSED
   intro can fool it, so if it warns that it's unsure, run again with
   `--language`. This matters most with `--no-vad`: on the same song it
   guessed English (24% sure) instead of Spanish.
+- **Mixed languages.** Without `--multilingual`, Whisper uses one language
+  for the whole file and *translates* anything else into it. With it, the
+  language is re-checked every 30 seconds, so a switch in the middle of a
+  section can still be missed.
 - **Songs need `--no-vad`.** The silence/music filter is tuned for speech,
   so it treats singing over a backing track as music and skips it. In a test
   on a 4.7-minute pop song with the filter on, it wrote only 11 subtitles.

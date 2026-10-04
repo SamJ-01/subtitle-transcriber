@@ -10,6 +10,7 @@ Examples:
     python transcribe.py clip.mp3 --language ja      # tell it the language
     python transcribe.py clip.mp3 --translate        # English subtitles
     python transcribe.py song.mp3 --no-vad           # songs and music videos
+    python transcribe.py mixed.mp3 --multilingual    # more than one language
 """
 
 import argparse
@@ -43,6 +44,11 @@ def parse_args(argv=None):
         "--language",
         help="language code such as en, es, fr, hi, ja or ar "
              "(default: detect it automatically)",
+    )
+    parser.add_argument(
+        "--multilingual", action="store_true",
+        help="for audio that switches between languages: detect the "
+             "language again for every 30-second section",
     )
     parser.add_argument(
         "--translate", action="store_true",
@@ -191,8 +197,11 @@ def main(argv=None):
         # "translate" turns any language into English; "transcribe" keeps it.
         task="translate" if args.translate else "transcribe",
         language=args.language,     # None means "detect it automatically"
+        multilingual=args.multilingual,  # re-detect the language every 30 seconds
         beam_size=1,                # check one guess at a time: fastest option
-        temperature=0,              # always pick the most likely words
+        # temperature is left at faster-whisper's default: if a section comes
+        # out stuck in a loop ("a little bit of a little bit of..."), it
+        # tries again with a bit more randomness to break out of it.
         condition_on_previous_text=False,  # stops it getting stuck repeating a line
         # Skip silence and music, where Whisper invents text. --no-vad turns
         # this off for songs, because sung vocals don't sound like speech.

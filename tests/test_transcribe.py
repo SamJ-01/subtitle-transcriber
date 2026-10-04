@@ -153,6 +153,24 @@ def test_no_warning_when_language_is_chosen(tmp_path, monkeypatch, capsys):
     assert "not sure" not in capsys.readouterr().out
 
 
+def test_multilingual_is_off_by_default(tmp_path, monkeypatch):
+    _, model = run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])])
+    assert model.called_with["multilingual"] is False
+
+
+def test_multilingual_option(tmp_path, monkeypatch):
+    _, model = run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])],
+                   extra_args=["--multilingual"])
+    assert model.called_with["multilingual"] is True
+
+
+def test_loop_protection_is_not_disabled(tmp_path, monkeypatch):
+    # Forcing temperature=0 turns off faster-whisper's retry when a section
+    # gets stuck repeating itself, so we must leave it at the default.
+    _, model = run(tmp_path, monkeypatch, [segment([word(" Hi", 0, 1)])])
+    assert "temperature" not in model.called_with
+
+
 def test_translate_option_asks_for_english(tmp_path, monkeypatch):
     _, model = run(tmp_path, monkeypatch, [segment([word(" Hello", 0, 1)])],
                    extra_args=["--translate"])
