@@ -1,1 +1,5 @@
 faster-whisper>=1.0
+# PyAV 19 removed an option that faster-whisper 1.2.1 still uses
+# (TypeError: open() got an unexpected keyword argument 'metadata_errors').
+# Remove this line once a faster-whisper release supports PyAV 19.
+av<19
