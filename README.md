@@ -25,7 +25,7 @@ uploaded anywhere.
 
 ## Why I built this
 
-I decided to see what I could do with Python + Ai. What triggered the project was the fact that I was listening to some international songs which lacked English subtitles. I wondered if a script could effectively actively generate accurate subtitles. The first version was a quick script with the file names
+What triggered the project was the fact that I was listening to some international songs which lacked English subtitles. I wondered if a script could effectively actively generate accurate subtitles. The first version was a quick script with the file names
 written into the code. This version is a reusable tool: options on the command
 line, better subtitle timing, and automated tests.
 
